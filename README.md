@@ -8,7 +8,7 @@ It is recommended to create a virtual python environment. At this point only one
 
 pip install pyusb  
 
-Documentation: https://bitbucket.org/heikozebresel/helix_usb/wiki/Home
+Documentation: https://github.com/kempline/helix_usb/wiki
 
 ## In Action
 An overview of the current features is given in 
