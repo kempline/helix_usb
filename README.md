@@ -18,3 +18,4 @@ An overview of the current features is given in
 Admitting that those features seem useless on their own, here's another video showing a typical use-case of helix_usb.
 
 [Combining helix_usb with a Line6 FBV3](https://www.youtube.com/watch?v=1Qndof3cb20)
+
