@@ -47,6 +47,13 @@ class HelixUsb:
 		'off', 'white', 'red', 'dark_orange', 'light_orange', 'yellow', 'green', 'turquoise', 'blue', 'violet',
 		'pink', 'auto_color']
 
+	UI_MODES = ['Stomp Mode', 'Scroll Mode', 'Preset Mode', 'Snapshot Mode']
+
+	VIEWS = {
+		194: "Play View",
+		195: "Edit View"
+	}
+
 	def __init__(self):
 
 		self.preset_no = 0
