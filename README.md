@@ -11,4 +11,10 @@ pip install pyusb
 Documentation: https://bitbucket.org/heikozebresel/helix_usb/wiki/Home
 
 ## In Action
+An overview of the current features is given in 
 
+[helix_usb - Feature Overview](https://www.youtube.com/watch?v=mRKcDVy7ZhU) 
+
+Admitting that those features seem useless on their own, here's another video showing a typical use-case of helix_usb.
+
+[Combining helix_usb with a Line6 FBV3](https://www.youtube.com/watch?v=1Qndof3cb20)
