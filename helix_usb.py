@@ -397,18 +397,30 @@ class HelixUsb:
 	def x2x10_keep_alive_thread_fct(self, start_delay):
 		log.info("Starting x2x10_keep_alive_thread, delay is: " + str(start_delay))
 		time.sleep(start_delay)
-		while self.stop_communication is False:
-			if self.expecting_x2_x10_response:
-				log.error('No x2x10 response!')
+
+		t = threading.currentThread()
+
+		if start_delay < 1.04:
+			self.endpoint_0x1_out(
+				[0x8, 0x0, 0x0, 0x18, 0x2, 0x10, 0xf0, 0x3, 0x0, "XX", 0x0, 0x10, 0x9, 0x10, 0x0, 0x0],
+				silent=True)
+			self.expecting_x2_x10_response = True
+			self.last_x2_x10_keep_alive_out = time.time()
+
+		while getattr(t, "do_run", True):
 
 			while self.last_x2_x10_keep_alive_out + 1.04 > time.time():
 				time.sleep(0.05)
+
+			if self.expecting_x2_x10_response:
+				log.error('No x2x10 response!')
 
 			self.endpoint_0x1_out(
 				[0x8, 0x0, 0x0, 0x18, 0x2, 0x10, 0xf0, 0x3, 0x0, "XX", 0x0, 0x10, 0x9, 0x10, 0x0, 0x0],
 				silent=True)
 			self.expecting_x2_x10_response = True
 			time.sleep(1.04)
+		log.info("Finished x2x10_keep_alive_thread")
 
 	def start_x1x10_keep_alive_thread(self, delay=0.0):
 		self.x1x10_keep_alive_thread = threading.Thread(target=self.x1x10_keep_alive_thread_fct, args=(delay,))
