@@ -4,9 +4,10 @@ helix_usb is a set of python scripts allowing for communications with Line6's HX
 ## Getting Started
 git clone https://github.com/kempline/helix_usb.git 
 
-It is recommended to create a virtual python environment. At this point only one additional library (pyusb) needs to be added:  
+It is recommended to create a virtual python environment. Please install the following modules:  
 
-pip install pyusb  
+pip install pyusb
+pip install xlsxwriter
 
 Documentation: https://github.com/kempline/helix_usb/wiki
 
