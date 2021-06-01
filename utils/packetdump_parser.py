@@ -2,7 +2,10 @@ import csv
 import re
 import sys
 import xlsxwriter
-from usb_helper import UsbHelper
+import logging
+import os
+
+log = logging.getLogger(__name__)
 
 
 def extract_data(data_lines):
@@ -380,6 +383,14 @@ file_list = [
 
 
 def main(args):
+
+	if len(args) > 1:
+		input_path = args[1]
+		if os.path.exists(input_path) is False:
+			log.error("Given path for input does not exist: " + input_path )
+		else:
+			export_all_endpoints(input_path, input_path + '.xlsx')
+		return
 
 	for file_path in file_list:
 		export_all_endpoints('../doc/' + file_path + '.txt', '../doc/' + file_path + '.xlsx')

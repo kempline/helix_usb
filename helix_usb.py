@@ -49,6 +49,15 @@ class HelixUsb:
 
 	UI_MODES = ['Stomp Mode', 'Scroll Mode', 'Preset Mode', 'Snapshot Mode']
 
+	FOOT_SWITCH_FUNCTIONS = \
+		["Tap/Tuner", "Stomp3", "PresetUp", "PresetDown", "SnapshotUp", "SnapshotDown", "AllBypass", "ToggleExp"]
+
+	FOOT_SWITCHES = {
+		"FS3": 0x61,
+		"FS4": 0x62,
+		"FS5": 0x63
+	}
+
 	VIEWS = {
 		194: "Play View",
 		195: "Edit View"
@@ -157,10 +166,14 @@ class HelixUsb:
 			cb_fct(self.preset_name)
 
 	def set_slot_info(self, slot_info_list):
-		if len(self.slot_data) != 16:
-			log.error('Wrong size for slot info - expected 16 slots')
-		elif len(slot_info_list) != 16:
-			log.error('Wrong size for slot info - expected 16 slots')
+
+		if len(slot_info_list) != 16:
+			log.error('Wrong size for slot info - expected 16 slots, CHECK PRESET - resetting to all empty')
+			self.slot_data = []
+			for i in range(0, 16):
+				si = EmptySlotInfo()
+				si.slot_no = i
+				self.slot_data.append(si)
 
 		for i in range(0, 16):
 			if self.slot_data[i] == slot_info_list[i]:
@@ -711,8 +724,26 @@ class HelixUsb:
 			data[34] = int(slot_no)
 			self.endpoint_0x1_out(data)
 		except ValueError:
-			log.error('Given function_codeis no integer: ' + str(slot_no))
+			log.error('Given function_code is no integer: ' + str(slot_no))
 			return
+
+	def set_fs_function(self, foot_switch_name, function_name):
+
+		try:
+			foot_switch_id = self.FOOT_SWITCHES[foot_switch_name]
+		except KeyError:
+			log.error("Unknown foot switch with name: " + foot_switch_name)
+			return
+
+		try:
+			foot_switch_function_id = self.FOOT_SWITCH_FUNCTIONS.index(function_name)
+		except ValueError:
+			log.error("Unknown foot switch function with name: " + function_name)
+			return
+
+		log.info(foot_switch_name + ": setting foot switch function to: " + function_name)
+		data = [0x1d, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x4, 0xc6, 0x1e, 0x0, 0x0, 0x1, 0x0, 0x6, 0x0, 0xd, 0x0, 0x0, 0x0, 0x83, 0x66, 0xcd, 0x4, 0x4, 0x64, 0x19, 0x65, 0x82, 0x76, foot_switch_id, 0x77, foot_switch_function_id, 0x0, 0x0, 0x0]
+		self.endpoint_0x1_out(data)
 
 	def set_preset_label_be_careful(self, prog_no, text):
 		msg_size_byte = 0x20 + len(text)
@@ -732,7 +763,12 @@ class HelixUsb:
 		log.info("*************************** Preset Name: " + preset_name)
 
 	def on_slot_update(self, slot_no, slot_info):
-		log.info('Slot ' + str(slot_no) + ' change: ' + slot_info.to_string())
+		try:
+			if slot_info.module_id == 'cc96':
+				log.info('Slot ' + str(slot_no) + ' change: Impulse Response')
+		except:
+			log.info('Slot ' + str(slot_no) + ' change: ' + slot_info.to_string())
+
 
 	def on_snapshot_change(self, current_snapshot):
 		log.info('Snapshot change to: ' + str(current_snapshot))
@@ -802,6 +838,13 @@ def main():
 					helix_usb.set_midi_cc(switch_id - 41, tokens[1])
 				elif switch_id in [51, 52, 53]:
 					helix_usb.set_custom_footswitch_function(switch_id - 51, tokens[1])
+				elif switch_id in [63, 64, 65]:
+					if switch_id == 63:
+						helix_usb.set_fs_function("FS3", tokens[1])
+					if switch_id == 64:
+						helix_usb.set_fs_function("FS4", tokens[1])
+					if switch_id == 65:
+						helix_usb.set_fs_function("FS5", tokens[1])
 				elif switch_id in [18]:
 					helix_usb.highlight_slot(tokens[1])
 				elif switch_id in [19]:
