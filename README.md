@@ -1,5 +1,5 @@
 # helix_usb
-helix_usb is a set of python scripts allowing for communications with Line6's HX Stomp (and maybe all other Helix products like the Helix (LT), maybe Pod Go, HX Effects and the rack version) over USB. For this, I kind of reverse engineered the protocol being send between HX Control and the HX Stomp.   
+helix_usb is a set of python scripts allowing for communications with Line6's HX Stomp (and maybe all other Helix products like the Helix (LT), maybe Pod Go, HX Effects and the rack version) over USB. For this, I kind of reverse engineered the protocol being send between HX Edit and the HX Stomp.   
 
 ## Getting Started
 git clone https://github.com/kempline/helix_usb.git 
