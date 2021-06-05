@@ -53,3 +53,5 @@ Thumbs.db
 
 # excel dump of last helix_ubs session
 dump.xlsx
+~$dump.xlsx
+
