@@ -51,3 +51,5 @@ Thumbs.db
 *.mov
 *.wmv
 
+# excel dump of last helix_ubs session
+dump.xlsx

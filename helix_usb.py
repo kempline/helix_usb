@@ -1,4 +1,5 @@
 import sys
+import signal
 import usb.core
 import usb.util
 import threading
@@ -8,6 +9,7 @@ import struct
 import binascii
 from utils.formatter import ca_splitter
 from utils.simple_filter import EmptySlotInfo
+from excel_logger import ExcelLogger
 import logging
 import copy
 from modes.connect import Connect
@@ -127,6 +129,8 @@ class HelixUsb:
 			self.slot_data.append(si)
 		self.slot_data_change_cb_fct_list = list()
 		self.snapshot_change_cb_fct_list = list()
+
+		self.excel_logger = ExcelLogger()
 
 	def switch_callback(self, id, val):
 		log.info('switch: ' + str(id) + ', value: ' + str(val))
@@ -554,9 +558,7 @@ class HelixUsb:
 		rounded_val = round(value[0], 2) * 10
 		return rounded_val
 
-	@staticmethod
-	def log_data_in(data):
-		# if data[6] not in[0x1, 0x2, 0x80]:
+	def log_data_in(self, data):
 		if data[6] not in [0x1, 0x2, 0x80]:
 			return
 		hex_str = ''.join('0x{:x}, '.format(x) for x in data)
@@ -567,9 +569,8 @@ class HelixUsb:
 		log.info('\t\t' + hex_str)
 		# log.info('\t\t' + str_rep)
 
-	@staticmethod
-	def log_data_out(data):
-		# if data[4] not in[0x1, 0x2, 0x80]:
+
+	def log_data_out(self, data):
 		if data[4] not in [0x1, 0x2, 0x80]:
 			return
 
@@ -597,7 +598,7 @@ class HelixUsb:
 		if not silent:
 			self.log_data_out(data)
 			# hex_str = ''.join('{:02x} '.format(x) for x in out_data)
-
+		self.excel_logger.log(data)
 		if data[4] == 0x1:
 			self.last_x1_x10_keep_alive_out = time.time()
 		elif data[4] == 0x2:
@@ -609,6 +610,7 @@ class HelixUsb:
 
 	def data_in(self, endpoint_id, data):
 		if endpoint_id == '0x81':
+			self.excel_logger.log(data)
 			try:
 				print_to_console = self.active_mode.data_in(data)
 				# if print_to_console:
@@ -672,7 +674,7 @@ class HelixUsb:
 			log.error('Given midi channel is no integer: ' + str(midi_channel))
 			return
 
-	def set_custom_footswitch_function(self, switch_no, function_code):
+	def set_custom_foot_switch_function(self, switch_no, function_code):
 		if switch_no not in [0, 1, 2]:
 			log.error("switch_no must be either 0, 1 or 2")
 			return
@@ -777,6 +779,9 @@ class HelixUsb:
 		log.info("******************** PRESET: " + str(preset_no))
 		self.preset_no = preset_no
 
+	def signal_handler(self, sig, frame):
+		self.excel_logger.save()
+
 
 def main():
 	logging.basicConfig(
@@ -788,6 +793,8 @@ def main():
 	helix_usb.register_preset_name_change_cb_fct(helix_usb.on_preset_name_update)
 	helix_usb.register_slot_data_change_cb_fct(helix_usb.on_slot_update)
 	helix_usb.register_snapshot_change_cb_fct(helix_usb.on_snapshot_change)
+
+	signal.signal(signal.SIGINT, helix_usb.signal_handler)
 
 	# only report Line6 Helix devices
 	usb_monitor = UsbMonitor(['0e41:4246', '0e41:5055'])
@@ -808,15 +815,18 @@ def main():
 			tokens = text.split(' ')
 			if len(tokens) == 1:
 				try:
-					text = int(text)
-					if text == 0:
-						helix_usb.switch_mode("RequestPresetName")
-					elif text == 1:
-						helix_usb.switch_mode("RequestPreset")
-					elif text == 2:
-						helix_usb.switch_mode("RequestPresetNames")
+					if text == "save":
+						helix_usb.excel_logger.save()
 					else:
-						log.warning('Unknown command id: ' + str(text))
+						text = int(text)
+						if text == 0:
+							helix_usb.switch_mode("RequestPresetName")
+						elif text == 1:
+							helix_usb.switch_mode("RequestPreset")
+						elif text == 2:
+							helix_usb.switch_mode("RequestPresetNames")
+						else:
+							log.warning('Unknown command id: ' + str(text))
 				except ValueError:
 					log.error('Invalid value - only integer values allowed')
 					continue
@@ -837,7 +847,7 @@ def main():
 				elif switch_id in [41, 42, 43]:
 					helix_usb.set_midi_cc(switch_id - 41, tokens[1])
 				elif switch_id in [51, 52, 53]:
-					helix_usb.set_custom_footswitch_function(switch_id - 51, tokens[1])
+					helix_usb.set_custom_foot_switch_function(switch_id - 51, tokens[1])
 				elif switch_id in [63, 64, 65]:
 					if switch_id == 63:
 						helix_usb.set_fs_function("FS3", tokens[1])
