@@ -86,7 +86,7 @@ class HelixUsb:
 		self.usb_io_exception_cb = self.on_usb_io_exception
 
 		self.maybe_session_no = 0x1a
-		self.get_preset_data_cnt = 0x1e
+		self.preset_data_double_cnt = [0x1e, 0x00]
 
 		self.stop_threads = False
 		self.x81_reader = None
@@ -333,14 +333,19 @@ class HelixUsb:
 		# print(str_rep_hex)
 		ca_splitter(str_rep_hex)
 
-	def next_preset_data_packet_no(self):
-		next_no = self.get_preset_data_cnt
-		self.get_preset_data_cnt += 1
-		self.get_preset_data_cnt %= 0xff
-		return next_no
+	def next_preset_data_packet_double(self):
+		next_preset_data_packet_double = self.preset_data_double_cnt
+		self.preset_data_double_cnt[0] += 1
+		if self.preset_data_double_cnt[0] > 0xff:
+			self.preset_data_double_cnt[0] = 0
+			self.preset_data_double_cnt[1] += 1
 
-	def preset_data_packet_no(self):
-		return self.get_preset_data_cnt
+		if self.preset_data_double_cnt[1] > 0xff:
+			self.preset_data_double_cnt[1] = 0
+		return next_preset_data_packet_double
+
+	def preset_data_packet_double(self):
+		return self.preset_data_double_cnt
 
 	def next_x80x10_packet_no(self):
 		next_no = self.x80x10_cnt
@@ -358,8 +363,9 @@ class HelixUsb:
 		t = threading.currentThread()
 
 		if start_delay < 1.04:
+			preset_data_packet_double = self.preset_data_packet_double()
 			self.endpoint_0x1_out(
-				[0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x10, self.maybe_session_no, self.preset_data_packet_no(), 0x0, 0x0],
+				[0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x10, self.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0],
 				silent=True
 			)
 			self.expecting_x80_x10_response = True
@@ -373,9 +379,10 @@ class HelixUsb:
 			# if self.awaiting_preset_name_data is False and self.awaiting_preset_data is False:
 			if self.expecting_x80_x10_response:
 				log.error('No x80x10 response!')
-			# packet_no = self.next_x80x10_packet_no()
+
+			preset_data_packet_double = self.preset_data_packet_double()
 			self.endpoint_0x1_out(
-				[0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x10, self.maybe_session_no, self.preset_data_packet_no(), 0x0, 0x0],
+				[0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x10, self.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0],
 				silent=True
 			)
 			self.expecting_x80_x10_response = True
