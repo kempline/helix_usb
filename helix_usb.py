@@ -131,6 +131,10 @@ class HelixUsb:
 		self.snapshot_change_cb_fct_list = list()
 
 		self.excel_logger = ExcelLogger()
+		self.preset_change_cnt = 0
+
+		# Modes
+		self.request_preset_mode = RequestPreset(self)
 
 	def switch_callback(self, id, val):
 		log.info('switch: ' + str(id) + ', value: ' + str(val))
@@ -499,7 +503,7 @@ class HelixUsb:
 				self.active_mode = RequestPresetName(self)
 				self.active_mode.start()
 			elif self.got_preset_name is True and self.got_preset is False:
-				self.active_mode = RequestPreset(self)
+				self.active_mode = self.request_preset_mode
 				self.active_mode.start()
 			elif self.got_preset is True and self.got_preset_names is False:
 				self.active_mode = RequestPresetNames(self)
@@ -783,7 +787,8 @@ class HelixUsb:
 		log.info('Snapshot change to: ' + str(current_snapshot))
 
 	def set_preset(self, preset_no):
-		log.info("******************** PRESET: " + str(preset_no))
+		self.preset_change_cnt += 1
+		log.info("******************** PRESET switch no: " + str(self.preset_change_cnt) +" to: " + str(preset_no))
 		self.preset_no = preset_no
 
 	def signal_handler(self, sig, frame):
