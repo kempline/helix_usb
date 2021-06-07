@@ -6,8 +6,8 @@ git clone https://github.com/kempline/helix_usb.git
 
 It is recommended to create a virtual python environment. Please install the following modules:  
 
-pip install pyusb
-pip install xlsxwriter
+* pip install pyusb
+* pip install xlsxwriter
 
 Documentation: https://github.com/kempline/helix_usb/wiki
 
