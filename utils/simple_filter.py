@@ -57,7 +57,7 @@ class StandardSlotInfo(SlotInfo):
             description = modules[self.module_id]
             return description[0]
         except KeyError:
-            print("ERROR: can't find module in modules")
+            print("ERROR: can't find module in modules: " + str(self.module_id))
             return None
 
     def to_string(self):
@@ -66,7 +66,7 @@ class StandardSlotInfo(SlotInfo):
             description = modules[self.module_id]
             return str(self.slot_no) + ":" + description[0] + ' (' + description[1] + ')'
         except KeyError:
-            print("ERROR: can't find module in modules")
+            print("ERROR: can't find module in modules: " + str(self.module_id))
             return str(self.slot_no) + ':NO MATCH FOR ' + self.module_id
 
 
@@ -121,7 +121,7 @@ class AmpCabSlotInfo(SlotInfo):
             cab_description = modules[self.cab_id]
             return str(self.slot_no) + ":Amp+Cab (" + amp_description[1] + ' + ' + cab_description[1] + ')'
         except KeyError:
-            print("ERROR: can't find module in modules")
+            print("ERROR: can't find module in modules: " + str(self.module_id))
             return str(self.slot_no) + ':NO MATCH FOR Amp: ' + self.amp_id + ', Cab: ' + self.cab_id
 
         # return '\'Amp: ' + self.amp_id + ', Cab: ' + self.amp_id + ' - Amp-Parameter: ' + str(self.amp_params) + ', Cab-Parameter: ' + str(self.cab_params)

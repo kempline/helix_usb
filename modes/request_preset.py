@@ -37,14 +37,77 @@ class RequestPreset(Standard):
 	def shutdown(self):
 		log.info('Shutting down mode')
 
+	def preset_info_complete(self):
+
+		slots = self.preset_data.split('8213')
+
+		# find first slot starting with either 06 or 08
+		slot_1_idx = -1
+		for i, slot in enumerate(slots):
+			if slot.startswith('06') or slot.startswith('08'):
+				slot_1_idx = i
+				break
+
+		if slot_1_idx == -1:
+			return False
+
+		if slot_1_idx == 0:
+			return False
+
+		# remove slots we don't understand or we don't need
+		slots = slots[slot_1_idx-1:]
+		slots = slots[0:20]
+		# we must have 20 slots now
+		if len(slots) != 20:
+			return False
+
+		if not slots[0].startswith('00'):
+			False
+		if not slots[9].startswith('01'):
+			False
+		if not slots[10].startswith('02'):
+			False
+		if not slots[19].startswith('03'):
+			False
+
+		assignable_slots = [1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18]
+		for slot_idx in assignable_slots:
+			if not (slot.startswith('06') or slot.startswith('08')):
+				return False
+
+		slot_infos = []
+		for slot_idx in assignable_slots:
+			slot_data = slots[slot_idx]
+			if slot_data == '0814c0':
+				# print(str(slot_idx) + ' is empty')
+				empty_slot_info = EmptySlotInfo()
+				empty_slot_info.slot_no = slot_idx
+				slot_infos.append(empty_slot_info)
+				continue
+			# print(slot_data)
+			slot_info = parse_standard_module_slot(slot_data)
+			if slot_info is None:
+				slot_info = parse_amp_and_cab_slot(slot_data)
+
+			if slot_info is None:
+				slot_info = parse_dual_cab_slot(slot_data)
+				if slot_info is None:
+					print("ERROR: Cannot read slot info: " + str(slot_idx))
+					continue
+
+			slot_info.slot_no = slot_idx
+			slot_infos.append(slot_info)
+		return slot_infos
+
 	def parse_preset_data(self):
+		# log.info("TIMER exec")
 		self.helix_usb.maybe_session_no = random.choice(range(0x04, 0xff))
 
 		# preset_data_packet_double = self.helix_usb.preset_data_packet_double()
 		# data_out = [0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x8, self.helix_usb.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0]
 		# self.helix_usb.endpoint_0x1_out(data_out, silent=True)
 
-		log.info("GOT PRESET DATA, length is: " + str(len(self.preset_data)))
+		# log.info("GOT PRESET DATA, length is: " + str(len(self.preset_data)))
 		str_out = ''
 		for b in self.preset_data:
 			str_out += hex(b) + ", "
@@ -71,18 +134,18 @@ class RequestPreset(Standard):
 
 	def data_in(self, data_in):
 
-		# if not self.in_transfer:
-		# 	if self.helix_usb.check_keep_alive_response(data_in):
-		# 		return False  # don't print incoming message to console
+		if self.helix_usb.check_keep_alive_response(data_in):
+			return False  # don't print incoming message to console
 
 		if data_in[6] != 0x80:
 			hex_str = ''.join('0x{:x}, '.format(x) for x in data_in)
 			log.error("Unexpected package while trying to read preset data: " + str(hex_str))
 			return True  # print incoming message to console
 
-		if self.helix_usb.my_byte_cmp(left=data_in, right=["XX", "XX", 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x4, "XX", "XX", 0x0, 0x0], length=16):
+		if self.helix_usb.my_byte_cmp(left=data_in, right=["XX", "XX", 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, "XX", "XX", "XX", 0x0, 0x0], length=16):
 			if self.wait_for_next_packet_timer is not None:
 				self.wait_for_next_packet_timer.cancel()
+				# log.info("TIMER cancelled")
 				self.wait_for_next_packet_timer = None
 
 			self.in_transfer = False
@@ -91,11 +154,20 @@ class RequestPreset(Standard):
 			if len(self.preset_data) == 0:
 				reply_here = False
 
+
+			# try calculating the size
+			expected_length = data_in[1] * 255 + data_in[0]
+			# expected_length -= 9
+
+			# log.info("Expected length: " + str(expected_length))
+			# log.info("Real length:     " + str(len(data_in) - 9))
+
 			for b in data_in[16:]:
 				self.preset_data.append(b)
 
 			if reply_here is False:
-				log.info('Skipping reply for first data packet')
+				# Skipping reply for first data packet
+				# log.info('Skipping reply for first data packet')
 				return True  # print incoming message to console
 
 			if data_in[1] != 2:
@@ -104,8 +176,17 @@ class RequestPreset(Standard):
 				next_packet_double_no = self.helix_usb.preset_data_packet_double()
 			data_out = [0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x8, self.helix_usb.maybe_session_no, next_packet_double_no[0], next_packet_double_no[1], 0x0]
 			self.helix_usb.endpoint_0x1_out(data_out, silent=True)
+
+			self.wait_for_next_packet_timer = threading.Timer(0.02, self.parse_preset_data)
+			self.wait_for_next_packet_timer.start()
+			# log.info("TIMER started")
 			return True
-															 0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, 0x32, 0x0, 0x10, 0x6f, 0x2, 0x0, 0x0
+
+		else:
+			hex_str = ''.join('0x{:x}, '.format(x) for x in data_in)
+			log.warning("Unexpected message in mode: " + str(hex_str))
+		return True
+		'''
 		elif self.helix_usb.my_byte_cmp(left=data_in, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x8, "XX", "XX", 0x0, 0x0], length=16):
 
 			# Either we received a pending keep-alive signal or a message marking the end of the transmission.
@@ -115,13 +196,10 @@ class RequestPreset(Standard):
 			self.wait_for_next_packet_timer = threading.Timer(0.02, self.parse_preset_data)
 			self.wait_for_next_packet_timer.start()
 
-			preset_data_packet_double = self.helix_usb.preset_data_packet_double()
-			data_out = [0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x8, self.helix_usb.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0]
-			self.helix_usb.endpoint_0x1_out(data_out, silent=True)
+			# preset_data_packet_double = self.helix_usb.preset_data_packet_double()
+			# data_out = [0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x8, self.helix_usb.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0]
+			# self.helix_usb.endpoint_0x1_out(data_out, silent=True)
 
 			return True  # print incoming message to console
+		'''
 
-		else:
-			hex_str = ''.join('0x{:x}, '.format(x) for x in data_in)
-			log.warning("Unexpected message in mode: " + str(hex_str))
-		return True

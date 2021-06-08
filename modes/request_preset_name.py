@@ -16,7 +16,7 @@ class RequestPresetName(Standard):
         preset_data_packet_double = self.helix_usb.preset_data_packet_double()
         data = [0x19, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x4, self.helix_usb.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0, 0x1, 0x0, 0x6,
                 0x0, 0x9, 0x0, 0x0, 0x0, 0x83, 0x66, 0xcd, 0x4, 0x4, 0x64, 0x17, 0x65, 0xc0, 0x0, 0x0, 0x0]
-        self.helix_usb.endpoint_0x1_out(data)
+        self.helix_usb.endpoint_0x1_out(data, silent=True)
 
     def shutdown(self):
         log.info('Shutting down mode')
@@ -26,7 +26,7 @@ class RequestPresetName(Standard):
             return False  # don't print incoming message to console
 
         elif self.helix_usb.my_byte_cmp(left=data_in[23:], right=[0x0, 0x83, 0x66, 0xcd, "XX", "XX", 0x67, 0x0, 0x68, 0x86, 0x6b, 0xcd, 0x0, 0x0, 0x6c, 0xcd], length=16):
-            self.helix_usb.log_data_in(data_in)
+            # self.helix_usb.log_data_in(data_in)
             for b in data_in[16:]:
                 self.preset_name_data.append(b)
 
@@ -46,7 +46,7 @@ class RequestPresetName(Standard):
 
                 self.helix_usb.switch_mode()
 
-            return True  # print incoming message to console
+            return False   # don't print incoming message to console
 
         else:
             hex_str = ''.join('0x{:x}, '.format(x) for x in data_in)

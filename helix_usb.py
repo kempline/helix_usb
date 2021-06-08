@@ -210,17 +210,17 @@ class HelixUsb:
 
 	def check_keep_alive_response(self, data):
 		# x1 keep alive response from device
-		if self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xef, 0x3, 0x1, 0x10, 0x0, "XX", 0x0, "XX", "XX", 0x2, 0x0, 0x0], length=16):
+		if self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xef, 0x3, 0x1, 0x10, 0x0, "XX", 0x0, 0x10, "XX", 0x2, 0x0, 0x0], length=16):
 			self.expecting_x1_x10_response = False
 			return True
 
 		# x2 keep alive response from device
-		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xf0, 0x3, 0x2, 0x10, 0x0, "XX", 0x0, "XX", "XX", 0x2, 0x0, 0x0], length=16):
+		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xf0, 0x3, 0x2, 0x10, 0x0, "XX", 0x0, 0x10, "XX", 0x2, 0x0, 0x0], length=16):
 			self.expecting_x2_x10_response = False
 			return True
 
 		# x80 keep alive response from device
-		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, "XX", "XX", "XX", "XX", "XX"], length=16):
+		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x10, "XX", "XX", "XX", "XX"], length=16):
 			self.expecting_x80_x10_response = False
 			return True
 
@@ -776,11 +776,7 @@ class HelixUsb:
 		log.info("*************************** Preset Name: " + preset_name)
 
 	def on_slot_update(self, slot_no, slot_info):
-		try:
-			if slot_info.module_id == 'cc96':
-				log.info('Slot ' + str(slot_no) + ' change: Impulse Response')
-		except:
-			log.info('Slot ' + str(slot_no) + ' change: ' + slot_info.to_string())
+		log.info('Slot ' + str(slot_no) + ' change: ' + slot_info.to_string())
 
 
 	def on_snapshot_change(self, current_snapshot):

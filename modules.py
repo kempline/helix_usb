@@ -645,5 +645,7 @@ modules = {
 	'3b':	['Cab', '2x15 Brute (mono)'],
 	'3c':	['Cab', '4x10 Ampeg HLF  (mono)'],
 	'49':	['Cab', '6x10 Cali Power  (mono)'],
-	'4a':	['Cab', '8x10 Ampeg SVT E (mono)']
+	'4a':	['Cab', '8x10 Ampeg SVT E (mono)'],
+	'cc95':	['Impulse Response', '1024 samples'],
+	'cc96':	['Impulse Response', '2048 samples']
 }
