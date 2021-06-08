@@ -190,7 +190,7 @@ def parse_parameter(data_stream):
 def parse_amp_and_cab_slot(slot_data):
 
     try:
-        idx = slot_data.index('09120ac3')
+        idx = slot_data.index('09120a')
     except ValueError:
         return None
 

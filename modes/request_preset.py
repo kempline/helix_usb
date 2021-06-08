@@ -186,20 +186,5 @@ class RequestPreset(Standard):
 			hex_str = ''.join('0x{:x}, '.format(x) for x in data_in)
 			log.warning("Unexpected message in mode: " + str(hex_str))
 		return True
-		'''
-		elif self.helix_usb.my_byte_cmp(left=data_in, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x8, "XX", "XX", 0x0, 0x0], length=16):
 
-			# Either we received a pending keep-alive signal or a message marking the end of the transmission.
-			# Since both message look similar (or even identical) we start a quick time. If no other message is
-			# received within a certain time, we shutdown the mode
-
-			self.wait_for_next_packet_timer = threading.Timer(0.02, self.parse_preset_data)
-			self.wait_for_next_packet_timer.start()
-
-			# preset_data_packet_double = self.helix_usb.preset_data_packet_double()
-			# data_out = [0x8, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x8, self.helix_usb.maybe_session_no, preset_data_packet_double[0], preset_data_packet_double[1], 0x0]
-			# self.helix_usb.endpoint_0x1_out(data_out, silent=True)
-
-			return True  # print incoming message to console
-		'''
 

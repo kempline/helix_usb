@@ -182,6 +182,7 @@ class HelixUsb:
 				si = EmptySlotInfo()
 				si.slot_no = i
 				self.slot_data.append(si)
+			return
 
 		for i in range(0, 16):
 			if self.slot_data[i] == slot_info_list[i]:
@@ -548,7 +549,10 @@ class HelixUsb:
 		# self.x81_reader = threading.Thread(target=self.endpoint_listener, args=())
 
 	@staticmethod
-	def my_byte_cmp(left, right, length):
+	def my_byte_cmp(left, right, length=-1):
+		if length == -1:
+			length = min(len(left), len(right))
+
 		if len(left) < length:
 			return False
 		if len(right) < length:
