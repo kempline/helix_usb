@@ -171,7 +171,7 @@ class PcapngToXlsx:
                                 endpoint_x1_times[2] = float(frame_time_relative)
 
                             else:
-                                print("WARNING: Unknown communication path in endpoint 0x1")
+                                print("WARNING: Unknown communication path in endpoint 0x1: " + str(full_data_int[4]) + ':' + str(full_data_int[5]))
 
                             xlsx_row_num += 1
                         else:  # endpoint 0x81
@@ -212,7 +212,8 @@ class PcapngToXlsx:
 
                                 endpoint_x81_times[2] = float(frame_time_relative)
                             else:
-                                print("WARNING: Unknown communication path in endpoint 0x81")
+                                print("WARNING: Unknown communication path in endpoint 0x81: " + str(full_data_int[4]) + ':' + str(full_data_int[5]))
+
                             xlsx_row_num += 1
                     except KeyError:
                         # packet has no data we are interested in

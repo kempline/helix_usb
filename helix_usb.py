@@ -69,6 +69,7 @@ class HelixUsb:
 
 		self.preset_no = 0
 		self.current_snapshot = 9
+		self.current_preset_no = -1
 
 		self.usb_device = None
 		self.active_configuration = None
@@ -121,6 +122,7 @@ class HelixUsb:
 
 		self.preset_name = ''
 		self.preset_name_change_cb_fct_list = list()
+		self.preset_no_change_cb_fct_list = list()
 
 		self.slot_data = []
 		for i in range(0, 16):
@@ -162,6 +164,10 @@ class HelixUsb:
 	def register_preset_name_change_cb_fct(self, p_cb_fct):
 		if p_cb_fct is not None:
 			self.preset_name_change_cb_fct_list.append(p_cb_fct)
+
+	def register_preset_no_change_cb_fct(self, p_cb_fct):
+		if p_cb_fct is not None:
+			self.preset_no_change_cb_fct_list.append(p_cb_fct)
 
 	def register_slot_data_change_cb_fct(self, p_cb_fct):
 		if p_cb_fct is not None:
@@ -665,8 +671,9 @@ class HelixUsb:
 		if switch_no not in [0, 1, 2]:
 			log.error("switch_no must be either 0, 1 or 2")
 			return
-
+		      # 0x21, 0x0, 0x0, 0x18, 0x03, 0x10, 0xed, 0x3, 0x0, 0x4a, 0x0, 0x4, 0xb0, 0x1c, 0x0, 0x0, 0x1, 0x0, 0x6, 0x0, 0x11, 0x0, 0x0, 0x0, 0x83, 0x66, 0xcd, 0x3, 0xf2, 0x64, 0x44, 0x65, 0x84, 0x18, 0x6            , 0x4d, 0x2, 0x1c, 0x2, 0x51, 0x33, 0x00, 0x00, 0x00   0x51 = i[39]
 		data = [0x21, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x4, 0x42, 0x1b, 0x0, 0x0, 0x1, 0x0, 0x6, 0x0, 0x11, 0x0, 0x0, 0x0, 0x83, 0x66, 0xcd, 0x3, 0xf3, 0x64, 0x44, 0x65, 0x84, 0x18, 0x6 + switch_no, 0x4d, 0x1, 0x1c, 0x2, 0x51, 0x2, 0x0, 0x0, 0x0]
+		data = [0x21, 0x0, 0x0, 0x18, 0x80, 0x10, 0xed, 0x3, 0x0, "XX", 0x0, 0x4, 0xb0, 0x1c, 0x0, 0x0, 0x1, 0x0, 0x6, 0x0, 0x11, 0x0, 0x0, 0x0, 0x83, 0x66, 0xcd, 0x3, 0xf2, 0x64, 0x44, 0x65, 0x84, 0x18, 0x6 + switch_no, 0x4d, 0x2, 0x1c, 0x2, 0x51, 0x33, 0x0, 0x0, 0x0]
 
 		try:
 			data[40] = int(cc)
@@ -782,11 +789,15 @@ class HelixUsb:
 	def on_slot_update(self, slot_no, slot_info):
 		log.info('Slot ' + str(slot_no) + ' change: ' + slot_info.to_string())
 
-
 	def on_snapshot_change(self, current_snapshot):
 		log.info('Snapshot change to: ' + str(current_snapshot))
 
 	def set_preset(self, preset_no):
+		self.current_preset_no = preset_no
+		for cb_fct in self.preset_no_change_cb_fct_list:
+			cb_fct(self.current_preset_no)
+
+	def on_preset_change(self, preset_no):
 		self.preset_change_cnt += 1
 		log.info("******************** PRESET switch no: " + str(self.preset_change_cnt) +" to: " + str(preset_no))
 		self.preset_no = preset_no
@@ -805,6 +816,7 @@ def main():
 	helix_usb.register_preset_name_change_cb_fct(helix_usb.on_preset_name_update)
 	helix_usb.register_slot_data_change_cb_fct(helix_usb.on_slot_update)
 	helix_usb.register_snapshot_change_cb_fct(helix_usb.on_snapshot_change)
+	helix_usb.register_preset_no_change_cb_fct(helix_usb.on_preset_change)
 
 	signal.signal(signal.SIGINT, helix_usb.signal_handler)
 
