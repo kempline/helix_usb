@@ -47,6 +47,26 @@ class HelixUsb:
 	FOOT_SWITCH_FUNCTIONS = \
 		["Tap/Tuner", "Stomp3", "PresetUp", "PresetDown", "SnapshotUp", "SnapshotDown", "AllBypass", "ToggleExp"]
 
+	MODULE_COLORS = {
+		"Distortion": "light_orange",
+		"Dynamic": "yellow",
+		"EQ": "yellow",
+		"Modulation": "blue",
+		"Delay": "green",
+		"Reverb": "dark_orange",
+		"Pitch/Synth": "violet",
+		"Filter": "violet",
+		"Wah": "violet",
+		"Amp+Cab": "red",
+		"Amp": "red",
+		"Preamp": "red",
+		"Cab": "red",
+		"Impulse Response": "pink",
+		"Volume/Pan": "turquoise",
+		"Send/Return": "turquoise",
+		"Looper": "white"
+	}
+
 	FOOT_SWITCHES = {
 		"FS3": 0x61,
 		"FS4": 0x62,

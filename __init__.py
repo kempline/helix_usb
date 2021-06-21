@@ -1,6 +1,7 @@
 import sys
 import os
 from .utils.usb_monitor import UsbMonitor
+from .modules import modules
 cwd = os.getcwd()
 helix_usb_path = os.path.join(cwd, 'helix_usb')
 sys.path.append(helix_usb_path)
