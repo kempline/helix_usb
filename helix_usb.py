@@ -66,7 +66,7 @@ class HelixUsb:
 		195: "Edit View"
 	}
 
-	def __init__(self, excel_log_path=None):
+	def __init__(self):
 
 		self.preset_no = 0
 		self.current_snapshot = 9
@@ -133,14 +133,18 @@ class HelixUsb:
 		self.slot_data_change_cb_fct_list = list()
 		self.snapshot_change_cb_fct_list = list()
 
-		if excel_log_path:
-			self.excel_logger = ExcelLogger(excel_log_path)
-		else:
-			self.excel_logger = None
+		self.excel_logger = None
+
 		self.preset_change_cnt = 0
 
 		# Modes
 		self.request_preset_mode = RequestPreset(self)
+
+	def set_excel_logger(self, excel_log_path):
+		if excel_log_path:
+			self.excel_logger = ExcelLogger(excel_log_path)
+		else:
+			self.excel_logger = None
 
 	def switch_callback(self, id, val):
 		log.info('switch: ' + str(id) + ', value: ' + str(val))
@@ -849,7 +853,8 @@ def main(argv):
 		log.error("While trying to parse command line arguments: " + str(e))
 		print_usage()
 
-	helix_usb = HelixUsb(excel_log_path)
+	helix_usb = HelixUsb()
+	helix_usb.set_excel_logger(excel_log_path)
 	helix_usb.register_preset_name_change_cb_fct(helix_usb.on_preset_name_update)
 	helix_usb.register_slot_data_change_cb_fct(helix_usb.on_slot_update)
 	helix_usb.register_snapshot_change_cb_fct(helix_usb.on_snapshot_change)
