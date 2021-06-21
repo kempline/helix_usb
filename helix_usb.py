@@ -34,14 +34,6 @@ class HelixUsb:
 	GET_STRING_VDEF = 0x09
 	GET_STRING_UNDEFINED = 0x0a
 
-	KPA_PRODUCT_ID = 0x0001
-	KPA_VENDOR_ID = 0x133e
-
-	RIG_TEMPO_ADDR_PAGE = 4
-	RIG_TEMPO_ADDR_NUMBER = 0
-
-	STEP_STATES = [0] * 128
-
 	ON = 0x01
 	OFF = 0x00
 
@@ -63,6 +55,14 @@ class HelixUsb:
 	VIEWS = {
 		194: "Play View",
 		195: "Edit View"
+	}
+
+	MIDI_CC = {
+		"EmulateFS1": 49,
+		"EmulateFS2": 50,
+		"EmulateFS3": 51,
+		"EmulateFS4": 52,
+		"EmulateFS5": 53
 	}
 
 	def __init__(self):
