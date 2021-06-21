@@ -12,6 +12,7 @@ from utils.simple_filter import EmptySlotInfo
 from excel_logger import ExcelLogger
 import logging
 import copy
+import getopt
 from modes.connect import Connect
 from modes.reconfigure_x1 import ReconfigureX1
 from modes.standard import Standard
@@ -65,7 +66,7 @@ class HelixUsb:
 		195: "Edit View"
 	}
 
-	def __init__(self):
+	def __init__(self, excel_log_path=None):
 
 		self.preset_no = 0
 		self.current_snapshot = 9
@@ -132,7 +133,10 @@ class HelixUsb:
 		self.slot_data_change_cb_fct_list = list()
 		self.snapshot_change_cb_fct_list = list()
 
-		self.excel_logger = ExcelLogger()
+		if excel_log_path:
+			self.excel_logger = ExcelLogger(excel_log_path)
+		else:
+			self.excel_logger = None
 		self.preset_change_cnt = 0
 
 		# Modes
@@ -619,7 +623,8 @@ class HelixUsb:
 		if not silent:
 			self.log_data_out(data)
 			# hex_str = ''.join('{:02x} '.format(x) for x in out_data)
-		self.excel_logger.log(data)
+		if self.excel_logger:
+			self.excel_logger.log(data)
 		if data[4] == 0x1:
 			self.last_x1_x10_keep_alive_out = time.time()
 		elif data[4] == 0x2:
@@ -631,7 +636,8 @@ class HelixUsb:
 
 	def data_in(self, endpoint_id, data):
 		if endpoint_id == '0x81':
-			self.excel_logger.log(data)
+			if self.excel_logger:
+				self.excel_logger.log(data)
 			try:
 				print_to_console = self.active_mode.data_in(data)
 				# if print_to_console:
@@ -803,16 +809,47 @@ class HelixUsb:
 		self.preset_no = preset_no
 
 	def signal_handler(self, sig, frame):
-		self.excel_logger.save()
+		if self.excel_logger:
+			self.excel_logger.save()
 
 
-def main():
+def print_usage(p_b_exit=True):
+	print()
+	print()
+	print("Usage: %s [args]" % sys.argv[0])
+	print()
+	print("args:")
+	print('\t-x: dumps session data to given xlsx file (Excel format)')
+	print()
+	print("switches:")
+	print('\t-h: prints this text')
+	print()
+
+	if p_b_exit is True:
+		sys.exit(1)
+
+
+def main(argv):
 	logging.basicConfig(
 		level='INFO',
 		format="%(asctime)s - %(levelname)s - %(message)s (%(name)s)",
 		datefmt="%Y-%m-%d %H:%M:%S")
 
-	helix_usb = HelixUsb()
+	excel_log_path = None
+	try:
+		opts, args = getopt.getopt(argv[1:], 'x:h', [])
+		for opt, arg in opts:
+			if opt in '-h':
+				print_usage()
+			elif opt in '-x':
+				excel_log_path = arg
+			else:
+				print_usage()
+	except getopt.GetoptError as e:
+		log.error("While trying to parse command line arguments: " + str(e))
+		print_usage()
+
+	helix_usb = HelixUsb(excel_log_path)
 	helix_usb.register_preset_name_change_cb_fct(helix_usb.on_preset_name_update)
 	helix_usb.register_slot_data_change_cb_fct(helix_usb.on_slot_update)
 	helix_usb.register_snapshot_change_cb_fct(helix_usb.on_snapshot_change)
@@ -891,4 +928,4 @@ def main():
 
 
 if __name__ == '__main__':
-	main()
+	main(sys.argv)
