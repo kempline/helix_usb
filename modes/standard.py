@@ -126,6 +126,11 @@ class Standard:
 			# Occurs once while every preset switch initiated at the stomp. data[42] seems to carry the preset number
 			pass
 
+		elif self.helix_usb.my_byte_cmp(left=data, right=[0x27, 0x0, 0x0, 0x18, 0xf0, 0x3, 0x2, 0x10, 0x0, "XX", 0x0, 0x4, 0x9, 0x2, 0x0, 0x0], length=16):
+			# Preset-step and related UI traffic can emit additional 0x27 status frames
+			# that are expected but currently not decoded here. Avoid warning flood.
+			return False
+
 		elif self.helix_usb.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x8, "XX", "XX", 0x0, 0x0]):
 			# This message signals that a preset transfer has ended in data[11] == 0x08.
 			# Indeed, it should usually be received and properly processed by request_preset mode!

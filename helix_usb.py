@@ -86,6 +86,10 @@ class HelixUsb:
 		"EmulateFS5": 53
 	}
 
+	MIDI_PROGRAM_MIN = 0
+	MIDI_PROGRAM_MAX = 125
+	MIDI_PROGRAM_CHANGE_CHANNEL = 0  # MIDI ch1, zero-based in status byte
+
 	def __init__(self):
 
 		self.preset_no = 0
@@ -98,6 +102,9 @@ class HelixUsb:
 		self.interface_2_1 = None
 		self.interface_3_1 = None
 		self.interface_4 = None
+		self.interface_4_number = 4
+		self.midi_kernel_driver_detached = False
+		self.midi_interface_claimed = False
 		self.endpoint_0x1_bulk_out = None
 		self.endpoint_0x81_bulk_in = None
 		self.endpoint_0x2_bulk_out = None
@@ -140,6 +147,7 @@ class HelixUsb:
 		self.got_preset_name = False
 		self.got_preset = False
 		self.got_preset_names = False
+		self.preset_names = []
 
 		self.preset_name = ''
 		self.preset_name_change_cb_fct_list = list()
@@ -154,6 +162,8 @@ class HelixUsb:
 		self.snapshot_change_cb_fct_list = list()
 
 		self.excel_logger = None
+		self.usb_monitor = None
+		self.shutdown_done = False
 
 		self.preset_change_cnt = 0
 
@@ -244,18 +254,19 @@ class HelixUsb:
 					self.session_quadruple[3] += 0x1
 
 	def check_keep_alive_response(self, data):
-		# x1 keep alive response from device
-		if self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xef, 0x3, 0x1, 0x10, 0x0, "XX", 0x0, 0x10, "XX", 0x2, 0x0, 0x0], length=16):
+		x1_pattern = [0x8, 0x0, 0x0, 0x18, 0xef, 0x3, 0x1, 0x10, 0x0, "XX", 0x0, 0x10]
+		x2_pattern = [0x8, 0x0, 0x0, 0x18, 0xf0, 0x3, 0x2, 0x10, 0x0, "XX", 0x0, 0x10]
+		x80_pattern = [0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x10]
+
+		if self.my_byte_cmp(left=data, right=x1_pattern, length=12):
 			self.expecting_x1_x10_response = False
 			return True
 
-		# x2 keep alive response from device
-		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xf0, 0x3, 0x2, 0x10, 0x0, "XX", 0x0, 0x10, "XX", 0x2, 0x0, 0x0], length=16):
+		if self.my_byte_cmp(left=data, right=x2_pattern, length=12):
 			self.expecting_x2_x10_response = False
 			return True
 
-		# x80 keep alive response from device
-		elif self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0xed, 0x3, 0x80, 0x10, 0x0, "XX", 0x0, 0x10, "XX", "XX", "XX", "XX"], length=16):
+		if self.my_byte_cmp(left=data, right=x80_pattern, length=12):
 			self.expecting_x80_x10_response = False
 			return True
 
@@ -285,6 +296,7 @@ class HelixUsb:
 
 		try:
 			self.interface_4 = self.active_configuration[(4, 0)]
+			self.interface_4_number = self.interface_4.bInterfaceNumber
 			for endpoint in self.interface_4:
 				desc = str(endpoint)
 				if "ENDPOINT 0x2: Bulk OUT" in desc:
@@ -339,6 +351,33 @@ class HelixUsb:
 			usb.util.claim_interface(self.usb_device, self.interface_3_1)
 		except usb.core.USBError as e:
 			log.error('While trying to claim interface 3.1, error: ' + str(e))
+
+		if self.interface_4 is not None:
+			self.midi_kernel_driver_detached = False
+			self.midi_interface_claimed = False
+
+			try:
+				if self.usb_device.is_kernel_driver_active(self.interface_4_number):
+					log.info('Detaching kernel driver from interface 4 (MIDI bulk)')
+					self.usb_device.detach_kernel_driver(self.interface_4_number)
+					self.midi_kernel_driver_detached = True
+			except NotImplementedError:
+				pass
+			except usb.core.USBError as e:
+				log.warning('Unable to detach kernel driver from interface 4 (MIDI bulk): %s', str(e))
+
+			try:
+				usb.util.claim_interface(self.usb_device, self.interface_4)
+				self.midi_interface_claimed = True
+			except usb.core.USBError as e:
+				self.endpoint_0x2_bulk_out = None
+				self.endpoint_0x82_bulk_in = None
+				log.warning(
+					'While trying to claim interface 4 (MIDI bulk): %s. '
+					'MIDI Program Change (p <n>/pu/pd) will be unavailable. '
+					'Close other MIDI apps using HX Stomp and retry.',
+					str(e)
+				)
 
 		'''
 		If you receive a libusb exception (USBError: [Errno 2] Entity not found) here,
@@ -652,7 +691,10 @@ class HelixUsb:
 		if data[4] == 0x1:
 			self.last_x1_x10_keep_alive_out = time.time()
 		elif data[4] == 0x2:
-			self.last_x2_x10_keep_alive_out = time.time()
+			# Only keep-alive packets should drive the x2 keep-alive watchdog timer.
+			# Other x2 traffic (e.g. preset-step commands) must not shift this clock.
+			if self.my_byte_cmp(left=data, right=[0x8, 0x0, 0x0, 0x18, 0x2, 0x10, 0xf0, 0x3, 0x0, "XX", 0x0, 0x10, 0x9, 0x10, 0x0, 0x0], length=16):
+				self.last_x2_x10_keep_alive_out = time.time()
 		elif data[4] == 0x80:
 			self.last_x80_x10_keep_alive_out = time.time()
 
@@ -827,26 +869,173 @@ class HelixUsb:
 		for cb_fct in self.preset_no_change_cb_fct_list:
 			cb_fct(self.current_preset_no)
 
+	def _get_effective_current_preset_no(self):
+		if HelixUsb.MIDI_PROGRAM_MIN <= self.current_preset_no <= HelixUsb.MIDI_PROGRAM_MAX:
+			return self.current_preset_no
+		if HelixUsb.MIDI_PROGRAM_MIN <= self.preset_no <= HelixUsb.MIDI_PROGRAM_MAX:
+			return self.preset_no
+		log.warning('Current preset index unknown; defaulting to %d for MIDI Program Change stepping', HelixUsb.MIDI_PROGRAM_MIN)
+		return HelixUsb.MIDI_PROGRAM_MIN
+
+	def send_midi_program_change(self, program_no):
+		if not isinstance(program_no, int):
+			log.error('Invalid MIDI Program Change value type: expected int, got %s', type(program_no).__name__)
+			return False
+
+		if program_no < HelixUsb.MIDI_PROGRAM_MIN or program_no > HelixUsb.MIDI_PROGRAM_MAX:
+			log.error('Preset number out of range for MIDI Program Change: %d (allowed %d..%d)',
+					  program_no, HelixUsb.MIDI_PROGRAM_MIN, HelixUsb.MIDI_PROGRAM_MAX)
+			return False
+
+		if self.endpoint_0x2_bulk_out is None:
+			log.error('Cannot send MIDI Program Change: USB MIDI OUT endpoint (0x2 bulk) is unavailable. '
+					  'Ensure interface 4 is claimable (close other MIDI apps, then reconnect/restart script).')
+			return False
+
+		if not self.midi_interface_claimed:
+			log.error('Cannot send MIDI Program Change: MIDI interface 4 is not claimed. '
+					  'Close other MIDI apps using HX Stomp and restart this script.')
+			return False
+
+		# USB-MIDI Event Packet (4 bytes):
+		#   byte0: CIN(0xC=Program Change) + cable(0)
+		#   byte1: status (0xC0 | channel)
+		#   byte2: program number
+		#   byte3: padding (unused for PC)
+		status = 0xC0 | (HelixUsb.MIDI_PROGRAM_CHANGE_CHANNEL & 0x0F)
+		midi_event_packet = [0x0C, status, program_no, 0x00]
+
+		try:
+			self.endpoint_0x2_bulk_out.write(midi_event_packet)
+		except usb.core.USBError as e:
+			log.error('Failed to send MIDI Program Change %d: %s. '
+				  'If interface 4 is busy, close other MIDI apps and retry.', program_no, str(e))
+			return False
+
+		self.set_preset(program_no)
+		log.info('Sent MIDI Program Change: preset %d', program_no)
+		return True
+
 	def on_preset_change(self, preset_no):
 		self.preset_change_cnt += 1
 		log.info("******************** PRESET switch no: " + str(self.preset_change_cnt) +" to: " + str(preset_no))
 		self.preset_no = preset_no
 
+	def step_preset_up(self):
+		current = self._get_effective_current_preset_no()
+		target = min(HelixUsb.MIDI_PROGRAM_MAX, current + 1)
+		if target == current:
+			log.info('Preset step up (pu): already at upper bound %d (clamped)', HelixUsb.MIDI_PROGRAM_MAX)
+			return
+		self.send_midi_program_change(target)
+
+	def step_preset_down(self):
+		current = self._get_effective_current_preset_no()
+		target = max(HelixUsb.MIDI_PROGRAM_MIN, current - 1)
+		if target == current:
+			log.info('Preset step down (pd): already at lower bound %d (clamped)', HelixUsb.MIDI_PROGRAM_MIN)
+			return
+		self.send_midi_program_change(target)
+
 	def signal_handler(self, sig, frame):
+		raise KeyboardInterrupt
+
+	def shutdown(self, usb_monitor=None):
+		if self.shutdown_done:
+			return
+
+		self.shutdown_done = True
+
+		if usb_monitor is None:
+			usb_monitor = self.usb_monitor
+
+		if usb_monitor is not None:
+			usb_monitor.request_terminate = True
+
+		self.stop_threads = True
+		self.stop_communication = True
+		self.stop_x80x10_communication = True
+
+		if self.x80x10_keep_alive_thread is not None:
+			self.x80x10_keep_alive_thread.do_run = False
+		if self.x2x10_keep_alive_thread is not None:
+			self.x2x10_keep_alive_thread.do_run = False
+
+		if self.active_mode is not None:
+			try:
+				self.active_mode.shutdown()
+			except Exception as e:
+				log.warning('Failed to shutdown active mode: ' + str(e))
+
+		for thread in [self.x81_reader, self.x1x10_keep_alive_thread, self.x2x10_keep_alive_thread, self.x80x10_keep_alive_thread]:
+			if thread is not None and thread.is_alive():
+				thread.join(timeout=1.0)
+
 		if self.excel_logger:
 			self.excel_logger.save()
+
+		if self.usb_device is not None:
+			if self.interface_4 is not None and self.midi_interface_claimed:
+				try:
+					usb.util.release_interface(self.usb_device, self.interface_4)
+				except usb.core.USBError as e:
+					log.warning('Failed to release interface 4 (MIDI bulk): ' + str(e))
+				finally:
+					self.midi_interface_claimed = False
+
+			if self.interface_4 is not None and self.midi_kernel_driver_detached:
+				try:
+					self.usb_device.attach_kernel_driver(self.interface_4_number)
+				except NotImplementedError:
+					pass
+				except usb.core.USBError as e:
+					log.warning('Failed to reattach kernel driver for interface 4 (MIDI bulk): ' + str(e))
+				finally:
+					self.midi_kernel_driver_detached = False
+
+			try:
+				usb.util.dispose_resources(self.usb_device)
+			except usb.core.USBError as e:
+				log.warning('Failed to dispose USB resources: ' + str(e))
 
 
 def print_usage(p_b_exit=True):
 	print()
 	print()
-	print("Usage: %s [args]" % sys.argv[0])
+	print("Usage: %s [options]" % sys.argv[0])
 	print()
-	print("args:")
-	print('\t-x: dumps session data to given xlsx file (Excel format)')
+	print("HX Stomp prerequisites:")
+	print('\t- Connect HX Stomp to this machine via USB before starting (or plug it in shortly after start).')
+	print('\t- Ensure permissions allow USB access for Line 6 device IDs 0e41:4246 / 0e41:5055.')
+	print('\t- Close other apps using HX Stomp MIDI if Program Change commands fail due to interface busy.')
+	print('\t- Power on the device; this script auto-detects and starts communication when found.')
 	print()
-	print("switches:")
-	print('\t-h: prints this text')
+	print("Options:")
+	print('\t-h\t\tShow this help text and exit')
+	print('\t-x <file.xlsx>\tDump session traffic to an Excel file (logged while running)')
+	print()
+	print("Interactive commands (at the 'command:' prompt):")
+	print('\t0\tRequest current preset name')
+	print('\t1\tRequest current preset data')
+	print('\t2\tRequest preset names list (prints one line per preset: "<index>: <name>")')
+	print('\tpu\tPreset up: send MIDI Program Change to current+1 (clamped 0..125)')
+	print('\tpd\tPreset down: send MIDI Program Change to current-1 (clamped 0..125)')
+	print('\tp <n>\tDirect preset select via MIDI Program Change, where n is 0..125')
+	print('\tsave\tFlush Excel log data to disk (only relevant with -x)')
+	print('\tq | quit | exit\tStop loop and perform clean shutdown')
+	print()
+	print("Common two-value commands:")
+	print('\t11|12|13 <color>\tSet FS3/FS4/FS5 LED color')
+	print('\t21|22|23 <label>\tSet FS3/FS4/FS5 label')
+	print('\t31|32|33 <channel>\tSet MIDI channel for FS3/FS4/FS5')
+	print('\t41|42|43 <cc>\tSet MIDI CC value for FS3/FS4/FS5')
+	print('\t51|52|53 <code>\tSet custom footswitch function code')
+	print('\t63|64|65 <name>\tSet FS3/FS4/FS5 function name')
+	print()
+	print("Examples:")
+	print('\tpython3 %s' % sys.argv[0])
+	print('\tpython3 %s -x session_capture.xlsx' % sys.argv[0])
+	print('\t# then at prompt: 0, pu, pd, p 42, 11 blue, 21 DRIVE, save, exit')
 	print()
 
 	if p_b_exit is True:
@@ -888,6 +1077,7 @@ def main(argv):
 	usb_monitor.register_device_found_cb(helix_usb.usb_device_found_cb)
 	usb_monitor.register_device_lost_cb(helix_usb.usb_device_lost_cb)
 	usb_monitor.start()
+	helix_usb.usb_monitor = usb_monitor
 
 	while True:
 
@@ -898,11 +1088,17 @@ def main(argv):
 			else:
 				text = input("command: ")
 			text = text.rstrip()
+			if text.lower() in ['q', 'quit', 'exit']:
+				break
 			tokens = text.split(' ')
 			if len(tokens) == 1:
 				try:
 					if text == "save":
 						helix_usb.excel_logger.save()
+					elif text.lower() == "pu":
+						helix_usb.step_preset_up()
+					elif text.lower() == "pd":
+						helix_usb.step_preset_down()
 					else:
 						text = int(text)
 						if text == 0:
@@ -914,13 +1110,29 @@ def main(argv):
 						else:
 							log.warning('Unknown command id: ' + str(text))
 				except ValueError:
-					log.error('Invalid value - only integer values allowed')
+					log.error('Invalid value - use: numeric command id, pu/pd, save, or exit')
 					continue
 			elif len(tokens) == 2:
+				if tokens[0].lower() == 'p':
+					try:
+						program_no = int(tokens[1])
+					except ValueError:
+						log.error('Invalid preset number for "p <n>": expected integer in range %d..%d',
+								  HelixUsb.MIDI_PROGRAM_MIN, HelixUsb.MIDI_PROGRAM_MAX)
+						continue
+
+					if program_no < HelixUsb.MIDI_PROGRAM_MIN or program_no > HelixUsb.MIDI_PROGRAM_MAX:
+						log.error('Invalid preset number for "p <n>": %d (allowed %d..%d)',
+								  program_no, HelixUsb.MIDI_PROGRAM_MIN, HelixUsb.MIDI_PROGRAM_MAX)
+						continue
+
+					helix_usb.send_midi_program_change(program_no)
+					continue
+
 				try:
 					switch_id = int(tokens[0])
 				except ValueError:
-					log.error('Invalid value - only integer values allowed')
+					log.error('Invalid value - use: p <n> or integer command id')
 					continue
 				if switch_id in [11, 12, 13]:
 					if tokens[1] in HelixUsb.LED_COLORS:
@@ -946,10 +1158,11 @@ def main(argv):
 				elif switch_id in [19]:
 					helix_usb.set_preset_label_be_careful(tokens[1])
 
-		except KeyboardInterrupt as _:
-			usb_monitor.request_terminate = True
-			helix_usb.stop_threads = True
-			return 0
+		except (KeyboardInterrupt, EOFError) as _:
+			break
+
+	helix_usb.shutdown(usb_monitor)
+	return 0
 
 
 if __name__ == '__main__':
