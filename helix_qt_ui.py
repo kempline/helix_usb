@@ -26,6 +26,7 @@ try:
 		QPushButton,
 		QSlider,
 		QSplitter,
+		QStyle,
 		QVBoxLayout,
 		QWidget,
 	)
@@ -49,6 +50,7 @@ except ImportError:
 		QPushButton,
 		QSlider,
 		QSplitter,
+		QStyle,
 		QVBoxLayout,
 		QWidget,
 	)
@@ -277,6 +279,8 @@ class MainWindow(QMainWindow):
 		main_layout = QVBoxLayout(root)
 
 		splitter = QSplitter(Qt.Orientation.Horizontal)
+		splitter.setChildrenCollapsible(False)
+		splitter.setHandleWidth(0)
 		main_layout.addWidget(splitter, 1)
 
 		left_panel = QWidget()
@@ -299,6 +303,26 @@ class MainWindow(QMainWindow):
 		btn_row_1.addWidget(self.btn_preset_up)
 		btn_row_1.addWidget(self.btn_preset_down)
 		left_layout.addLayout(btn_row_1)
+
+		preset_metrics = self.preset_list.fontMetrics()
+		preset_text_width = preset_metrics.horizontalAdvance("000: " + ("W" * 16))
+		scrollbar_width = self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+		list_frame_width = self.preset_list.frameWidth() * 2
+		list_content_padding = 24
+		list_min_width = preset_text_width + scrollbar_width + list_frame_width + list_content_padding
+
+		btn_spacing = max(0, btn_row_1.spacing())
+		button_row_min_width = (
+			self.btn_refresh_presets.sizeHint().width()
+			+ self.btn_preset_up.sizeHint().width()
+			+ self.btn_preset_down.sizeHint().width()
+			+ (2 * btn_spacing)
+		)
+
+		left_margins = left_layout.contentsMargins()
+		left_panel_width = max(list_min_width, button_row_min_width, preset_header.sizeHint().width())
+		left_panel_width += left_margins.left() + left_margins.right()
+		left_panel.setFixedWidth(left_panel_width)
 
 		right_panel = QWidget()
 		right_layout = QVBoxLayout(right_panel)
@@ -442,7 +466,9 @@ class MainWindow(QMainWindow):
 		self.log_view.setVisible(False)
 		main_layout.addWidget(self.log_view)
 
-		splitter.setSizes([420, 780])
+		splitter.setStretchFactor(0, 0)
+		splitter.setStretchFactor(1, 1)
+		splitter.setSizes([left_panel.width(), 1])
 		self._apply_styles()
 		self._refresh_block_strip_visuals()
 
