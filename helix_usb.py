@@ -23,6 +23,9 @@ log = logging.getLogger(__name__)
 
 
 class HelixUsb:
+	PRESET_LIST_COUNT = 125
+	PRESET_PLACEHOLDER_NAME = '<empty>'
+
 	GET_STRING_VENDOR = 0x01
 	GET_STRING_PRODUCT = 0x02
 	GET_STRING_SERIAL = 0x03
@@ -148,6 +151,7 @@ class HelixUsb:
 		self.got_preset = False
 		self.got_preset_names = False
 		self.preset_names = []
+		self.preset_names_change_cb_fct_list = list()
 
 		self.preset_name = ''
 		self.preset_name_change_cb_fct_list = list()
@@ -207,6 +211,10 @@ class HelixUsb:
 		if p_cb_fct is not None:
 			self.preset_no_change_cb_fct_list.append(p_cb_fct)
 
+	def register_preset_names_change_cb_fct(self, p_cb_fct):
+		if p_cb_fct is not None:
+			self.preset_names_change_cb_fct_list.append(p_cb_fct)
+
 	def register_slot_data_change_cb_fct(self, p_cb_fct):
 		if p_cb_fct is not None:
 			self.slot_data_change_cb_fct_list.append(p_cb_fct)
@@ -216,6 +224,22 @@ class HelixUsb:
 		self.preset_name = name
 		for cb_fct in self.preset_name_change_cb_fct_list:
 			cb_fct(self.preset_name)
+
+	def set_preset_names(self, preset_names):
+		normalized_names = list(preset_names[:HelixUsb.PRESET_LIST_COUNT])
+		if len(normalized_names) < HelixUsb.PRESET_LIST_COUNT:
+			missing = HelixUsb.PRESET_LIST_COUNT - len(normalized_names)
+			log.warning('Preset-name list shorter than expected (%d < %d); filling %d placeholder entries',
+						len(normalized_names), HelixUsb.PRESET_LIST_COUNT, missing)
+			normalized_names.extend([HelixUsb.PRESET_PLACEHOLDER_NAME] * missing)
+		elif len(preset_names) > HelixUsb.PRESET_LIST_COUNT:
+			log.warning('Preset-name list longer than expected (%d > %d); truncating extra entries',
+						len(preset_names), HelixUsb.PRESET_LIST_COUNT)
+
+		self.preset_names = normalized_names
+		self.got_preset_names = True
+		for cb_fct in self.preset_names_change_cb_fct_list:
+			cb_fct(self.preset_names)
 
 	def set_slot_info(self, slot_info_list):
 
