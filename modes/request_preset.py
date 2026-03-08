@@ -2,9 +2,10 @@ from modes.standard import Standard
 import random
 from modules import modules
 from utils.formatter import format_1
-from utils.simple_filter import slot_splitter_2
+# from utils.simple_filter import slot_extract, fs_info_extract
 import logging
 import threading
+from utils.preset_parser import HxPreset
 log = logging.getLogger(__name__)
 
 
@@ -12,6 +13,7 @@ class RequestPreset(Standard):
 	def __init__(self, helix_usb):
 		Standard.__init__(self, helix_usb=helix_usb, name="request_preset")
 		self.preset_data = []
+		self.hx_preset = None
 		self.data_requests_packages_or_whatever = []
 		self.num_received_1f = 0
 		self.request_preset_session_id = 0xf4
@@ -113,10 +115,28 @@ class RequestPreset(Standard):
 			str_out += hex(b) + ", "
 		str_out = str_out[:-2]
 		nice_str = format_1(str_out)
-		slot_data = slot_splitter_2(nice_str)
-		# print(str_out)
 		# print(nice_str)
-		self.helix_usb.set_slot_info(slot_data)
+
+		self.hx_preset = HxPreset(data_in=nice_str,
+								  preset_no=self.helix_usb.preset_no,
+								  preset_name=self.helix_usb.preset_name)
+		self.hx_preset.to_string()
+
+		# fs_info_list = fs_info_extract(nice_str)
+
+		'''
+		for fs_info in fs_info_list:
+			print(fs_info.to_string())
+		
+		slot_data = slot_extract(nice_str)
+		for slot in slot_data:
+			print(slot.to_string())
+		'''
+		# self.helix_usb.set_slot_info(slot_data)
+		# print(str_out)
+
+
+
 
 		# splitter for the labels: 87 0A 00 0B 84 00 03 05 A9
 		# active snapshot information:

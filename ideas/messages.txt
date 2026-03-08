@@ -1,0 +1,14 @@
+0b83020 might be the start-marker for parameter
+c83020003000490 might be the end-amrker - not there in IR-blocks
+
+There is 8302 in both elements
+
+061485188317c219cd010a1aff09010ac20b83020503050495ca3f800000ca43eb0000ca4516f000ca3f800000ca000000000c83020003000490
+                                                 5
+
+                                                 This number might give the numbers of following parameters
+
+061485188317c219cc811aff09010ac20b83020b030b049bca00000000ca00000000ca00000000ca00000000ca3fb33330ca3fc00000ca00000000ca00000000ca00000000ca00000000ca000000000c83020003000490
+                                               b (11)
+
+
